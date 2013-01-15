@@ -185,14 +185,27 @@ main (int argc, char **argv)
       while (me)
 	{
 	  if (!excluded_fstype (me->me_type))
-	    fprintf (stdout, " %s (%s)\n", me->me_mountdir, me->me_type);
+	    fprintf (stdout, " %s (%s) %s\n", me->me_mountdir, me->me_type,
+		     me->me_opts);
 
 	  meprev = me;
 	  me = me->me_next;
 	  if (meprev->me_type_malloced)
-	    free (meprev);
+	    free (meprev->me_type);
+	  if (meprev->me_opts_malloced)
+	    free (meprev->me_opts);
+	  free (meprev);
 	}
       free (mount_list);
+    }
+
+  /* free 'fs_exclude_list' */
+  struct fs_type_list *fsp = fs_exclude_list, *next;
+  while (fsp)
+    {
+      next = fsp->fs_next;
+      free (fsp);
+      fsp = next;
     }
 
   return status;

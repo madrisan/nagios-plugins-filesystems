@@ -135,13 +135,17 @@ main (int argc, char **argv)
 
   if (show_listed_fs)
     {
+      struct mount_entry *meprev;
       me = mount_list;
       fprintf (stdout, "List of checked filesystems:\n");
       while (me)
 	{
 	  fprintf (stdout, " %s (%s)\n", me->me_mountdir, me->me_type);
+	  meprev = me;
 	  me = me->me_next;
+	  free (meprev);
 	}
+      free (mount_list);
     }
 
   return status;

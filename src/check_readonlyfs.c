@@ -36,9 +36,15 @@
 
 #include "mountlist.h"
 #include "nputils.h"
+#include "xalloc.h"
 
-/* Linked list of mounted file systems. */
-static struct mount_entry *mount_list;
+/* A file system type to display. */
+
+struct fs_type_list
+{
+  char *fs_name;
+  struct fs_type_list *fs_next;
+};
 
 /* Linked list of file system types to display.
  * If 'fs_select_list' is NULL, list all types.
@@ -55,8 +61,10 @@ static struct fs_type_list *fs_select_list;
 
 /* Linked list of file system types to omit.
  *    If the list is empty, don't exclude any types.  */
-
 static struct fs_type_list *fs_exclude_list;
+
+/* Linked list of mounted file systems. */
+static struct mount_entry *mount_list;
 
 /* If true, show only local file systems.  */
 static bool show_local_fs;
@@ -78,8 +86,37 @@ static struct option const longopts[] = {
   {(char *) "help", no_argument, NULL, 'h'},
   {(char *) "version", no_argument, NULL, 'V'},
   {(char *) "list", no_argument, NULL, 'L'},
+  {(char *) "exclude-type", required_argument, NULL, 'X'},
   {NULL, 0, NULL, 0}
 };
+
+/* Add FSTYPE to the list of file system types to be omitted. */
+
+static void
+add_excluded_fs_type (const char *fstype)
+{
+  struct fs_type_list *fsp;
+
+  fsp = xmalloc (sizeof *fsp);
+  fsp->fs_name = (char *) fstype;
+  fsp->fs_next = fs_exclude_list;
+  fs_exclude_list = fsp;
+}
+
+/* Is FSTYPE a type of file system that should be omitted?  */
+
+static bool
+excluded_fstype (const char *fstype)
+{
+  const struct fs_type_list *fsp;
+
+  if (fs_exclude_list == NULL || fstype == NULL)
+    return false;
+  for (fsp = fs_exclude_list; fsp; fsp = fsp->fs_next)
+    if (strcmp (fstype, fsp->fs_name) == 0)
+      return true;
+  return false;
+}
 
 static void __attribute__ ((__noreturn__)) usage (FILE * out)
 {
@@ -87,10 +124,13 @@ static void __attribute__ ((__noreturn__)) usage (FILE * out)
 check for readonly filesystems\n\
 Copyright (C) 2013 Davide Madrisan <" PACKAGE_BUGREPORT ">\n", out);
   fputs ("\n\
-  Usage:\n\
-\t" PACKAGE_NAME " --list\n\
-\t" PACKAGE_NAME " --help\n\
-\t" PACKAGE_NAME " --version\n\n", out);
+Usage: " PACKAGE_NAME " [OPTION]... [FILE]...\n\n", out);
+  fputs ("\
+Mandatory arguments to long options are mandatory for short options too.\n", stdout);
+  fputs ("\
+  -X, --exclude-type=TYPE   limit listing to file systems not of type TYPE\n\
+  -h, --help                display this help and exit\n\
+  -v, --version             output version information and exit\n", out);
 
   exit (out == stderr ? STATE_UNKNOWN : STATE_OK);
 }
@@ -103,7 +143,7 @@ main (int argc, char **argv)
   fs_exclude_list = NULL;
   print_type = false;
 
-  while ((c = getopt_long (argc, argv, "LhV", longopts, NULL)) != -1)
+  while ((c = getopt_long (argc, argv, "LX:hV", longopts, NULL)) != -1)
     {
       switch (c)
 	{
@@ -112,6 +152,9 @@ main (int argc, char **argv)
 	  break;
 	case 'L':
 	  show_listed_fs = true;
+	  break;
+	case 'X':
+	  add_excluded_fs_type (optarg);
 	  break;
 	case 'h':
 	  usage (stdout);
@@ -140,7 +183,9 @@ main (int argc, char **argv)
       fprintf (stdout, "List of checked filesystems:\n");
       while (me)
 	{
-	  fprintf (stdout, " %s (%s)\n", me->me_mountdir, me->me_type);
+	  if (!excluded_fstype (me->me_type))
+	    fprintf (stdout, " %s (%s)\n", me->me_mountdir, me->me_type);
+
 	  meprev = me;
 	  me = me->me_next;
 	  free (meprev);

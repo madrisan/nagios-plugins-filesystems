@@ -32,6 +32,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 
 #include "mountlist.h"
@@ -188,7 +189,8 @@ main (int argc, char **argv)
 
 	  meprev = me;
 	  me = me->me_next;
-	  free (meprev);
+	  if (meprev->me_type_malloced)
+	    free (meprev);
 	}
       free (mount_list);
     }

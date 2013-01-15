@@ -61,6 +61,10 @@ static struct fs_type_list *fs_exclude_list;
 /* If true, show only local file systems.  */
 static bool show_local_fs;
 
+/* If true, show each file system corresponding to the
+   command line arguments.  */
+static bool show_listed_fs;
+
 /* If true, print file system type as well.  */
 static bool print_type;
 
@@ -96,7 +100,6 @@ main (int argc, char **argv)
 {
   int c, status = STATE_UNKNOWN;
   struct mount_entry *me;
-  bool print_mountedfs = false;
   fs_exclude_list = NULL;
   print_type = false;
 
@@ -108,7 +111,7 @@ main (int argc, char **argv)
 	  usage (stderr);
 	  break;
 	case 'L':
-	  print_mountedfs = true;
+	  show_listed_fs = true;
 	  break;
 	case 'h':
 	  usage (stdout);
@@ -130,7 +133,7 @@ main (int argc, char **argv)
       perror ("cannot read table of mounted file systems");
     }
 
-  if (print_mountedfs)
+  if (show_listed_fs)
     {
       me = mount_list;
       fprintf (stdout, "List of checked filesystems:\n");

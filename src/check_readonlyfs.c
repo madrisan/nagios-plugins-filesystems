@@ -39,6 +39,8 @@
 #include "nputils.h"
 #include "xalloc.h"
 
+#define STREQ(a, b) (strcmp (a, b) == 0)
+
 /* A file system type to display. */
 
 struct fs_type_list
@@ -74,9 +76,6 @@ static bool show_local_fs;
    command line arguments.  */
 static bool show_listed_fs;
 
-/* If true, print file system type as well.  */
-static bool print_type;
-
 static void __attribute__ ((__noreturn__)) print_version (void)
 {
   puts (PACKAGE_NAME " version " PACKAGE_VERSION);
@@ -86,10 +85,40 @@ static void __attribute__ ((__noreturn__)) print_version (void)
 static struct option const longopts[] = {
   {(char *) "help", no_argument, NULL, 'h'},
   {(char *) "version", no_argument, NULL, 'V'},
+  {(char *) "local", no_argument, NULL, 'l'},
   {(char *) "list", no_argument, NULL, 'L'},
+  {(char *) "type", required_argument, NULL, 'T'},
   {(char *) "exclude-type", required_argument, NULL, 'X'},
   {NULL, 0, NULL, 0}
 };
+
+/* Add FSTYPE to the list of file system types to display. */
+
+static void
+add_fs_type (const char *fstype)
+{
+  struct fs_type_list *fsp;
+
+  fsp = xmalloc (sizeof *fsp);
+  fsp->fs_name = (char *) fstype;
+  fsp->fs_next = fs_select_list;
+  fs_select_list = fsp;
+}
+
+/* Is FSTYPE a type of file system that should be listed?  */
+
+static bool
+selected_fstype (const char *fstype)
+{
+  const struct fs_type_list *fsp;
+
+  if (fs_select_list == NULL || fstype == NULL)
+    return true;
+  for (fsp = fs_select_list; fsp; fsp = fsp->fs_next)
+    if (STREQ (fstype, fsp->fs_name))
+      return true;
+  return false;
+}
 
 /* Add FSTYPE to the list of file system types to be omitted. */
 
@@ -114,7 +143,7 @@ excluded_fstype (const char *fstype)
   if (fs_exclude_list == NULL || fstype == NULL)
     return false;
   for (fsp = fs_exclude_list; fsp; fsp = fsp->fs_next)
-    if (strcmp (fstype, fsp->fs_name) == 0)
+    if (STREQ (fstype, fsp->fs_name))
       return true;
   return false;
 }
@@ -129,6 +158,9 @@ Usage: " PACKAGE_NAME " [OPTION]... [FILE]...\n\n", out);
   fputs ("\
 Mandatory arguments to long options are mandatory for short options too.\n", stdout);
   fputs ("\
+  -l, --local               limit listing to local file systems\n\
+  -L, --list                display the list of checked file systems\n\
+  -T, --type=TYPE           limit listing to file systems of type TYPE\n\
   -X, --exclude-type=TYPE   limit listing to file systems not of type TYPE\n\
   -h, --help                display this help and exit\n\
   -v, --version             output version information and exit\n", out);
@@ -140,19 +172,26 @@ int
 main (int argc, char **argv)
 {
   int c, status = STATE_UNKNOWN;
-  struct mount_entry *me;
-  fs_exclude_list = NULL;
-  print_type = false;
+  struct mount_entry *me, *meprev;
 
-  while ((c = getopt_long (argc, argv, "LX:hV", longopts, NULL)) != -1)
+  fs_select_list = NULL;
+  fs_exclude_list = NULL;
+
+  while ((c = getopt_long (argc, argv, "lLT:X:hV", longopts, NULL)) != -1)
     {
       switch (c)
 	{
 	default:
 	  usage (stderr);
 	  break;
+	case 'l':
+	  show_local_fs = true;
+	  break;
 	case 'L':
 	  show_listed_fs = true;
+	  break;
+	case 'T':
+	  add_fs_type (optarg);
 	  break;
 	case 'X':
 	  add_excluded_fs_type (optarg);
@@ -166,38 +205,63 @@ main (int argc, char **argv)
 	}
     }
 
+  /* Fail if the same file system type was both selected and excluded.  */
+  {
+    bool match = false;
+    struct fs_type_list *fs_incl;
+    for (fs_incl = fs_select_list; fs_incl; fs_incl = fs_incl->fs_next)
+      {
+	struct fs_type_list *fs_excl;
+	for (fs_excl = fs_exclude_list; fs_excl; fs_excl = fs_excl->fs_next)
+	  {
+	    if (STREQ (fs_incl->fs_name, fs_excl->fs_name))
+	      {
+		fprintf (stderr,
+			 "file system type %s both selected and excluded\n",
+			 fs_incl->fs_name);
+		match = true;
+		break;
+	      }
+	  }
+      }
+    if (match)
+      return STATE_UNKNOWN;
+  }
+
   mount_list =
     read_file_system_list ((fs_select_list != NULL
-			    || fs_exclude_list != NULL
-			    || print_type || show_local_fs));
+			    || fs_exclude_list != NULL || show_local_fs));
 
   if (NULL == mount_list)
     {
       /* Couldn't read the table of mounted file systems. */
-      perror ("cannot read table of mounted file systems");
+      fprintf (stderr, "cannot read table of mounted file systems");
+      return STATE_UNKNOWN;
     }
 
-  if (show_listed_fs)
+  me = mount_list;
+  while (me)
     {
-      struct mount_entry *meprev;
-      me = mount_list;
-      fprintf (stdout, "List of checked filesystems:\n");
-      while (me)
+      if ((excluded_fstype (me->me_type) == false)
+	  && (selected_fstype (me->me_type) == true))
 	{
-	  if (!excluded_fstype (me->me_type))
-	    fprintf (stdout, " %s (%s) %s\n", me->me_mountdir, me->me_type,
-		     me->me_opts);
-
-	  meprev = me;
-	  me = me->me_next;
-	  if (meprev->me_type_malloced)
-	    free (meprev->me_type);
-	  if (meprev->me_opts_malloced)
-	    free (meprev->me_opts);
-	  free (meprev);
+	  if ((show_local_fs && !me->me_remote) || !show_local_fs)
+	    {
+	      if (show_listed_fs)
+		fprintf (stdout, " %s (%s) %s\n", me->me_mountdir,
+			 me->me_type, me->me_opts);
+              /* TODO  */
+	    }
 	}
-      free (mount_list);
+      meprev = me;
+      me = me->me_next;
+      if (meprev->me_type_malloced)
+	free (meprev->me_type);
+      if (meprev->me_opts_malloced)
+	free (meprev->me_opts);
+      free (meprev);
     }
+  free (mount_list);
 
   /* free 'fs_exclude_list' */
   struct fs_type_list *fsp = fs_exclude_list, *next;

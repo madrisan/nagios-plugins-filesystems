@@ -171,7 +171,7 @@ Mandatory arguments to long options are mandatory for short options too.\n", std
 int
 main (int argc, char **argv)
 {
-  int c, status = STATE_UNKNOWN;
+  int c, status = STATE_OK;
   struct mount_entry *me, *meprev;
 
   fs_select_list = NULL;
@@ -248,9 +248,14 @@ main (int argc, char **argv)
 	  if ((show_local_fs && !me->me_remote) || !show_local_fs)
 	    {
 	      if (show_listed_fs)
-		fprintf (stdout, " %s (%s) %s\n", me->me_mountdir,
-			 me->me_type, me->me_opts);
-              /* TODO  */
+		fprintf (stdout, " %s (%s) %s%s\n", me->me_mountdir,
+			 me->me_type, me->me_opts,
+			 (me->me_readonly) ? " *** readonly! ***" : "");
+	      else if (me->me_readonly)
+		{
+		  fprintf (stderr, "%s is readonly!\n", me->me_mountdir);	/* FIXME */
+		  status = STATE_CRITICAL;
+		}
 	    }
 	}
       meprev = me;

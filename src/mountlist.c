@@ -40,6 +40,11 @@
              || strcmp (Fs_type, "cifs") == 0)))
 #endif
 
+#ifndef ME_READONLY
+# define ME_READONLY(Fs_name, Fs_opts)          \
+    (strcmp (Fs_opts, "ro") == 0)
+#endif
+
 #if defined MOUNTED_GETMNTENT1 || defined MOUNTED_GETMNTENT2
 
 /* Return the device number from MOUNT_OPTIONS, if possible.
@@ -107,6 +112,7 @@ read_file_system_list (bool need_fs_type)
 	me->me_type_malloced = me->me_opts_malloced = 1;
 	me->me_dummy = ME_DUMMY (me->me_devname, me->me_type);
 	me->me_remote = ME_REMOTE (me->me_devname, me->me_type);
+	me->me_readonly = ME_READONLY (me->me_devname, me->me_opts);
 	me->me_dev = dev_from_mount_options (mnt->mnt_opts);
 
 	/* Add to the linked list. */

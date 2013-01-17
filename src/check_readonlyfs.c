@@ -253,7 +253,11 @@ main (int argc, char **argv)
 			 (me->me_readonly) ? " *** readonly! ***" : "");
 	      else if (me->me_readonly)
 		{
-		  fprintf (stderr, "%s is readonly!\n", me->me_mountdir);	/* FIXME */
+		  fprintf (stderr, "%s%s",
+			   (status ==
+			    STATE_CRITICAL) ? "," :
+			   "READONLY FILE SYSTEMS CRITICAL: ",
+			   me->me_mountdir);
 		  status = STATE_CRITICAL;
 		}
 	    }
@@ -276,6 +280,11 @@ main (int argc, char **argv)
       free (fsp);
       fsp = next;
     }
+
+  if (status == STATE_OK)
+      fprintf (stdout, "READONLY FILE SYSTEMS OK\n");
+  else
+      fprintf (stderr, " readonly!\n");
 
   return status;
 }

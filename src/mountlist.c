@@ -40,11 +40,6 @@
              || strcmp (Fs_type, "cifs") == 0)))
 #endif
 
-#ifndef ME_READONLY
-# define ME_READONLY(Fs_name, Fs_opts)          \
-    (strcmp (Fs_opts, "ro") == 0)
-#endif
-
 #if defined MOUNTED_GETMNTENT1 || defined MOUNTED_GETMNTENT2
 
 /* Return the device number from MOUNT_OPTIONS, if possible.
@@ -80,6 +75,27 @@ dev_from_mount_options (char const *mount_options)
 
 #endif
 
+/* Check for the "ro" pattern in the MOUNT_OPTIONS.
+ *    Return true if found, Otherwise return false.  */
+static bool
+fs_check_if_readonly (char *mount_options)
+{
+  static char const readonly_pattern[] = "ro";
+  char *str1, *token, *saveptr1;
+  int j;
+
+  for (j = 1, str1 = mount_options;; j++, str1 = NULL)
+    {
+      token = strtok_r (str1, ",", &saveptr1);
+      if (token == NULL)
+	break;
+      if (strcmp (token, readonly_pattern) == 0)
+	return true;
+    }
+
+  return false;
+}
+
 /* Return a list of the currently mounted file systems, or NULL on error.
  *    Add each entry to the tail of the list so that they stay in order.
  *       If NEED_FS_TYPE is true, ensure that the file system type fields in
@@ -112,7 +128,7 @@ read_file_system_list (bool need_fs_type)
 	me->me_type_malloced = me->me_opts_malloced = 1;
 	me->me_dummy = ME_DUMMY (me->me_devname, me->me_type);
 	me->me_remote = ME_REMOTE (me->me_devname, me->me_type);
-	me->me_readonly = ME_READONLY (me->me_devname, me->me_opts);
+	me->me_readonly = fs_check_if_readonly (me->me_opts);
 	me->me_dev = dev_from_mount_options (mnt->mnt_opts);
 
 	/* Add to the linked list. */

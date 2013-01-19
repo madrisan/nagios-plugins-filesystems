@@ -118,7 +118,7 @@ AC_COMPILE_IFELSE(
   [ac_cv_struct_option_getopt_h=no])
 AC_MSG_RESULT([$ac_cv_struct_option_getopt_h])
 
-AC_CHECK_HEADERS([mntent.h])
+AC_CHECK_HEADERS([sys/mntent.h mntent.h])
 
 AC_PREFIX_DEFAULT(/usr/local/nagios)
 

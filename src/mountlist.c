@@ -1,5 +1,15 @@
 #include "config.h"
 
+#include <errno.h>
+#include <fcntl.h>
+#include <limits.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include "mountlist.h"
+#include "xalloc.h"
+
 #ifdef MOUNTED_GETMNTENT1
 # include <mntent.h>
 # if !defined MOUNTED
@@ -9,13 +19,21 @@
 # endif
 #endif
 
-#include <errno.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+#ifdef MOUNTED_GETMNTENT2	/* SVR4.  */
+# include <sys/mnttab.h>
+#endif
 
-#include "mountlist.h"
-#include "xalloc.h"
+#if HAVE_SYS_MNTENT_H
+/* This is to get MNTOPT_IGNORE on e.g. SVR4.  */
+# include <sys/mntent.h>
+#endif
+
+#undef MNT_IGNORE
+#if defined MNTOPT_IGNORE && defined HAVE_HASMNTOPT
+# define MNT_IGNORE(M) hasmntopt (M, MNTOPT_IGNORE)
+#else
+# define MNT_IGNORE(M) 0
+#endif
 
 #ifndef ME_DUMMY
 # define ME_DUMMY(Fs_name, Fs_type)             \
@@ -74,6 +92,81 @@ dev_from_mount_options (char const *mount_options)
 }
 
 #endif
+
+#ifdef MOUNTED_GETMNTENT2	/* SVR4.  */
+{
+  struct mnttab mnt;
+  char *table = MNTTAB;
+  FILE *fp;
+  int ret;
+  int lockfd = -1;
+
+# if defined F_RDLCK && defined F_SETLKW
+  /* MNTTAB_LOCK is a macro name of our own invention; it's not present in
+     e.g. Solaris 2.6.  If the SVR4 folks ever define a macro
+     for this file name, we should use their macro name instead.
+     (Why not just lock MNTTAB directly?  We don't know.)  */
+#  ifndef MNTTAB_LOCK
+#   define MNTTAB_LOCK "/etc/.mnttab.lock"
+#  endif
+  lockfd = open (MNTTAB_LOCK, O_RDONLY);
+  if (0 <= lockfd)
+    {
+      struct flock flock;
+      flock.l_type = F_RDLCK;
+      flock.l_whence = SEEK_SET;
+      flock.l_start = 0;
+      flock.l_len = 0;
+      while (fcntl (lockfd, F_SETLKW, &flock) == -1)
+	if (errno != EINTR)
+	  {
+	    int saved_errno = errno;
+	    close (lockfd);
+	    errno = saved_errno;
+	    return NULL;
+	  }
+    }
+  else if (errno != ENOENT)
+    return NULL;
+# endif
+
+  errno = 0;
+  fp = fopen (table, "r");
+  if (fp == NULL)
+    ret = errno;
+  else
+    {
+      while ((ret = getmntent (fp, &mnt)) == 0)
+	{
+	  me = xmalloc (sizeof *me);
+	  me->me_devname = xstrdup (mnt.mnt_special);
+	  me->me_mountdir = xstrdup (mnt.mnt_mountp);
+	  me->me_type = xstrdup (mnt.mnt_fstype);
+	  me->me_opts = xstrdup (mnt.mnt_mntopts);
+	  me->me_type_malloced = me->me_opts_malloced = 1;
+	  me->me_dummy = MNT_IGNORE (&mnt) != 0;
+	  me->me_remote = ME_REMOTE (me->me_devname, me->me_type);
+	  me->me_readonly = fs_check_if_readonly (me->me_opts);
+	  me->me_dev = dev_from_mount_options (mnt.mnt_mntopts);
+
+	  /* Add to the linked list. */
+	  *mtail = me;
+	  mtail = &me->me_next;
+	}
+
+      ret = fclose (fp) == EOF ? errno : 0 < ret ? 0 : -1;
+    }
+
+  if (0 <= lockfd && close (lockfd) != 0)
+    ret = errno;
+
+  if (0 <= ret)
+    {
+      errno = ret;
+      goto free_then_fail;
+    }
+}
+#endif /* MOUNTED_GETMNTENT2.  */
 
 /* Check for the "ro" pattern in the MOUNT_OPTIONS.
  *    Return true if found, Otherwise return false.  */

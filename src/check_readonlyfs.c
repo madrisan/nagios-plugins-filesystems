@@ -147,6 +147,57 @@ excluded_fstype (const char *fstype)
   return false;
 }
 
+static int
+check_all_entries (void)
+{
+  struct mount_entry *me;
+  int status = STATE_OK;
+
+  for (me = mount_list; me; me = me->me_next)
+    {
+      if ((excluded_fstype (me->me_type) == true) ||
+	  (selected_fstype (me->me_type) == false) ||
+	  (show_local_fs && me->me_remote))
+	continue;
+
+      if (show_listed_fs)
+	printf ("%s  (%s) %s\n", me->me_mountdir,
+		me->me_type, (me->me_readonly) ? " *** readonly! ***" : "");
+      else if (me->me_readonly && (status == STATE_OK))
+	{
+	  fprintf (stderr, "FILESYSTEMS CRITICAL: %s", me->me_mountdir);
+	  status = STATE_CRITICAL;
+	}
+      else if (me->me_readonly)
+	{
+	  fprintf (stderr, ",%s", me->me_mountdir);
+	  status = STATE_CRITICAL;
+	}
+    }
+
+  return status;
+}
+
+static int
+check_entry (char const *name)
+{
+  struct mount_entry *me;
+
+  for (me = mount_list; me; me = me->me_next)
+    if (STREQ (me->me_mountdir, name))
+      {
+	if ((excluded_fstype (me->me_type) == true) ||
+	    (selected_fstype (me->me_type) == false) ||
+	    (show_local_fs && me->me_remote))
+	  return STATE_OK;
+
+	if (me->me_readonly)
+	  return STATE_CRITICAL;
+      }
+
+  return STATE_OK;
+}
+
 static void __attribute__ ((__noreturn__)) usage (FILE * out)
 {
   fprintf (out, "%s, version %s - check for readonly filesystems.\n",
@@ -249,29 +300,25 @@ main (int argc, char **argv)
       return STATE_UNKNOWN;
     }
 
+  if (optind < argc)
+    {
+      int i;
+
+      for (i = optind; i < argc; ++i)
+	if (argv[i] && (check_entry (argv[i]) == STATE_CRITICAL))
+	  {
+	    fprintf (stderr, "%s%s",
+		     status == STATE_OK ? "FILESYSTEMS CRITICAL: " : ",",
+		     argv[i]);
+	    status = STATE_CRITICAL;
+	  }
+    }
+  else
+    status = check_all_entries ();
+
   me = mount_list;
   while (me)
     {
-      if ((excluded_fstype (me->me_type) == false)
-	  && (selected_fstype (me->me_type) == true))
-	{
-	  if ((show_local_fs && !me->me_remote) || !show_local_fs)
-	    {
-	      if (show_listed_fs)
-		fprintf (stdout, " %s (%s) %s%s\n", me->me_mountdir,
-			 me->me_type, me->me_opts,
-			 (me->me_readonly) ? " *** readonly! ***" : "");
-	      else if (me->me_readonly)
-		{
-		  fprintf (stderr, "%s%s",
-			   (status ==
-			    STATE_CRITICAL) ? "," :
-			   "READONLY FILE SYSTEMS CRITICAL: ",
-			   me->me_mountdir);
-		  status = STATE_CRITICAL;
-		}
-	    }
-	}
       meprev = me;
       me = me->me_next;
       if (meprev->me_type_malloced)
@@ -292,9 +339,9 @@ main (int argc, char **argv)
     }
 
   if (status == STATE_OK)
-      fprintf (stdout, "READONLY FILE SYSTEMS OK\n");
+    printf ("FILESYSTEMS OK\n");
   else
-      fprintf (stderr, " readonly!\n");
+    fprintf (stderr, " readonly!\n");
 
   return status;
 }

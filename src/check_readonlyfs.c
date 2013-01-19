@@ -30,9 +30,12 @@
 #include <mntent.h>
 #endif
 
+#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 #include "mountlist.h"
@@ -203,7 +206,7 @@ static void __attribute__ ((__noreturn__)) usage (FILE * out)
   fprintf (out, "%s, version %s - check for readonly filesystems.\n",
 	   program_name, program_version);
   fprintf (out, "%s\n\n", program_copyright);
-  fprintf (out, "Usage: %s [OPTION]... [FILE]...\n\n", program_name);
+  fprintf (out, "Usage: %s [OPTION]... [FILESYSTEM]...\n\n", program_name);
   fputs ("\
   -l, --local               limit listing to local file systems\n\
   -L, --list                display the list of checked file systems\n\
@@ -232,6 +235,7 @@ main (int argc, char **argv)
 {
   int c, status = STATE_OK;
   struct mount_entry *me, *meprev;
+  struct stat *stats = 0;
 
   fs_select_list = NULL;
   fs_exclude_list = NULL;
@@ -276,8 +280,8 @@ main (int argc, char **argv)
 	    if (STREQ (fs_incl->fs_name, fs_excl->fs_name))
 	      {
 		fprintf (stderr,
-			 "file system type %s both selected and excluded\n",
-			 fs_incl->fs_name);
+			 "%s: file system type `%s' both selected and excluded\n",
+			 program_name, fs_incl->fs_name);
 		match = true;
 		break;
 	      }
@@ -286,6 +290,32 @@ main (int argc, char **argv)
     if (match)
       return STATE_UNKNOWN;
   }
+
+  if (optind < argc)
+    {
+      int i;
+
+      /* Open each of the given entries to make sure any corresponding                                            
+       * partition is automounted.  This must be done before reading the                                          
+       * file system table.  */
+      stats = xnmalloc (argc - optind, sizeof *stats);
+      for (i = optind; i < argc; ++i)
+	{
+	  /* Prefer to open with O_NOCTTY and use fstat, but fall back                                             
+	   * on using "stat", in case the file is unreadable.  */
+	  int fd = open (argv[i], O_RDONLY | O_NOCTTY);
+	  if ((fd < 0 || fstat (fd, &stats[i - optind]))
+	      && stat (argv[i], &stats[i - optind]))
+	    {
+	      fprintf (stderr, "%s, cannot open `%s\n'", program_name,
+		       argv[i]);
+	      argv[i] = NULL;
+	    }
+	  if (0 <= fd)
+	    close (fd);
+	}
+      free (stats);
+    }
 
   mount_list =
     read_file_system_list ((fs_select_list != NULL

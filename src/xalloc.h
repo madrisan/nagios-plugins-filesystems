@@ -40,5 +40,7 @@ void *xmemdup (void const *p, size_t s)
       _GL_ATTRIBUTE_MALLOC _GL_ATTRIBUTE_ALLOC_SIZE ((2));
 char *xstrdup (char const *str)
       _GL_ATTRIBUTE_MALLOC;
+void *xnmalloc (size_t n, size_t s)
+      _GL_ATTRIBUTE_MALLOC _GL_ATTRIBUTE_ALLOC_SIZE ((1, 2));
 
 #endif /* !XALLOC_H_ */

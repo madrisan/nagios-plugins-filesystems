@@ -52,3 +52,12 @@ xstrdup (char const *string)
 {
   return xmemdup (string, strlen (string) + 1);
 }
+
+/* Allocate an array of N objects, each with S bytes of memory,
+ *    dynamically, with error checking.  S must be nonzero.  */
+
+void *
+xnmalloc (size_t n, size_t s)
+{
+  return xmalloc (n * s);
+}

@@ -41,6 +41,11 @@
 
 #define STREQ(a, b) (strcmp (a, b) == 0)
 
+static const char *program_name = "check_readonlyfs";
+static const char *program_version = PACKAGE_VERSION;
+static const char *program_copyright =
+  "Copyright (C) 2013 Davide Madrisan <" PACKAGE_BUGREPORT ">";
+
 /* A file system type to display. */
 
 struct fs_type_list
@@ -76,15 +81,9 @@ static bool show_local_fs;
    command line arguments.  */
 static bool show_listed_fs;
 
-static void __attribute__ ((__noreturn__)) print_version (void)
-{
-  puts (PACKAGE_NAME " version " PACKAGE_VERSION);
-  exit (STATE_OK);
-}
-
 static struct option const longopts[] = {
   {(char *) "help", no_argument, NULL, 'h'},
-  {(char *) "version", no_argument, NULL, 'V'},
+  {(char *) "version", no_argument, NULL, 'v'},
   {(char *) "local", no_argument, NULL, 'l'},
   {(char *) "list", no_argument, NULL, 'L'},
   {(char *) "type", required_argument, NULL, 'T'},
@@ -150,11 +149,10 @@ excluded_fstype (const char *fstype)
 
 static void __attribute__ ((__noreturn__)) usage (FILE * out)
 {
-  fputs (PACKAGE_NAME " ver." PACKAGE_VERSION " - \
-check for readonly filesystems\n\
-Copyright (C) 2013 Davide Madrisan <" PACKAGE_BUGREPORT ">\n", out);
-  fputs ("\n\
-Usage: " PACKAGE_NAME " [OPTION]... [FILE]...\n\n", out);
+  fprintf (out, "%s, version %s - check for readonly filesystems.\n",
+	   program_name, program_version);
+  fprintf (out, "%s\n\n", program_copyright);
+  fprintf (out, "Usage: %s [OPTION]... [FILE]...\n\n", program_name);
   fputs ("\
 Mandatory arguments to long options are mandatory for short options too.\n", stdout);
   fputs ("\
@@ -168,6 +166,18 @@ Mandatory arguments to long options are mandatory for short options too.\n", std
   exit (out == stderr ? STATE_UNKNOWN : STATE_OK);
 }
 
+static void __attribute__ ((__noreturn__)) print_version (void)
+{
+  printf ("%s, version %s\n", program_name, program_version);
+  printf ("%s\n", program_copyright);
+  fputs ("\
+License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>\n\n\
+This is free software; you are free to change and redistribute it.\n\
+There is NO WARRANTY, to the extent permitted by law.\n", stdout);
+
+  exit (STATE_OK);
+}
+
 int
 main (int argc, char **argv)
 {
@@ -177,7 +187,7 @@ main (int argc, char **argv)
   fs_select_list = NULL;
   fs_exclude_list = NULL;
 
-  while ((c = getopt_long (argc, argv, "lLT:X:hV", longopts, NULL)) != -1)
+  while ((c = getopt_long (argc, argv, "lLT:X:hv", longopts, NULL)) != -1)
     {
       switch (c)
 	{
@@ -199,7 +209,7 @@ main (int argc, char **argv)
 	case 'h':
 	  usage (stdout);
 	  break;
-	case 'V':
+	case 'v':
 	  print_version ();
 	  break;
 	}

@@ -205,8 +205,6 @@ static void __attribute__ ((__noreturn__)) usage (FILE * out)
   fprintf (out, "%s\n\n", program_copyright);
   fprintf (out, "Usage: %s [OPTION]... [FILE]...\n\n", program_name);
   fputs ("\
-Mandatory arguments to long options are mandatory for short options too.\n", stdout);
-  fputs ("\
   -l, --local               limit listing to local file systems\n\
   -L, --list                display the list of checked file systems\n\
   -T, --type=TYPE           limit listing to file systems of type TYPE\n\

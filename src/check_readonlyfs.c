@@ -167,15 +167,12 @@ check_all_entries (void)
 	printf ("%s  (%s) %s\n", me->me_mountdir,
 		me->me_type, (me->me_readonly) ? " *** readonly! ***" : "");
       else if (me->me_readonly && (status == STATE_OK))
-	{
-	  fprintf (stderr, "FILESYSTEMS CRITICAL: %s", me->me_mountdir);
-	  status = STATE_CRITICAL;
-	}
+	fprintf (stderr, "FILESYSTEMS CRITICAL: %s", me->me_mountdir);
       else if (me->me_readonly)
-	{
-	  fprintf (stderr, ",%s", me->me_mountdir);
-	  status = STATE_CRITICAL;
-	}
+	fprintf (stderr, ",%s", me->me_mountdir);
+
+      if (me->me_readonly)
+	status = STATE_CRITICAL;
     }
 
   return status;
@@ -193,6 +190,10 @@ check_entry (char const *name)
 	    (selected_fstype (me->me_type) == false) ||
 	    (show_local_fs && me->me_remote))
 	  return STATE_OK;
+
+	if (show_listed_fs)
+	  printf ("%s  (%s) %s\n", me->me_mountdir,
+		  me->me_type, (me->me_readonly) ? " *** readonly! ***" : "");
 
 	if (me->me_readonly)
 	  return STATE_CRITICAL;
@@ -324,7 +325,8 @@ main (int argc, char **argv)
   if (NULL == mount_list)
     {
       /* Couldn't read the table of mounted file systems. */
-      fprintf (stderr, "cannot read table of mounted file systems");
+      fprintf (stderr, "%s: cannot read table of mounted file systems\n",
+	       program_name);
       return STATE_UNKNOWN;
     }
 
@@ -335,9 +337,11 @@ main (int argc, char **argv)
       for (i = optind; i < argc; ++i)
 	if (argv[i] && (check_entry (argv[i]) == STATE_CRITICAL))
 	  {
-	    fprintf (stderr, "%s%s",
-		     status == STATE_OK ? "FILESYSTEMS CRITICAL: " : ",",
-		     argv[i]);
+	    if (!show_listed_fs)
+	      fprintf (stderr, "%s%s",
+		       status == STATE_OK ? "FILESYSTEMS CRITICAL: " : ",",
+		       argv[i]);
+
 	    status = STATE_CRITICAL;
 	  }
     }
@@ -366,10 +370,13 @@ main (int argc, char **argv)
       fsp = next;
     }
 
-  if (status == STATE_OK)
-    printf ("FILESYSTEMS OK\n");
-  else
-    fprintf (stderr, " readonly!\n");
+  if (!show_listed_fs)
+    {
+      if (status == STATE_OK)
+	printf ("FILESYSTEMS OK\n");
+      else
+	fprintf (stderr, " readonly!\n");
+    }
 
   return status;
 }

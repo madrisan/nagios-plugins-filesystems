@@ -11,12 +11,12 @@ Usage
 
 Options 
 
-  -l, --local               limit listing to local file systems
-  -L, --list                display the list of checked file systems
-  -T, --type=TYPE           limit listing to file systems of type TYPE
-  -X, --exclude-type=TYPE   limit listing to file systems not of type TYPE
-  -h, --help                display this help and exit
-  -v, --version             output version information and exit
+	-l, --local               limit listing to local file systems
+	-L, --list                display the list of checked file systems
+	-T, --type=TYPE           limit listing to file systems of type TYPE
+	-X, --exclude-type=TYPE   limit listing to file systems not of type TYPE
+	-h, --help                display this help and exit
+	-v, --version             output version information and exit
 
 Examples
 

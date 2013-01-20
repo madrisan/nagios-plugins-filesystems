@@ -58,6 +58,27 @@
              || strcmp (Fs_type, "cifs") == 0)))
 #endif
 
+/* Check for the "ro" pattern in the MOUNT_OPTIONS.
+ *    Return true if found, Otherwise return false.  */
+static bool
+fs_check_if_readonly (char *mount_options)
+{
+  static char const readonly_pattern[] = "ro";
+  char *str1, *token, *saveptr1;
+  int j;
+
+  for (j = 1, str1 = mount_options;; j++, str1 = NULL)
+    {
+      token = strtok_r (str1, ",", &saveptr1);
+      if (token == NULL)
+	break;
+      if (strcmp (token, readonly_pattern) == 0)
+	return true;
+    }
+
+  return false;
+}
+
 #if defined MOUNTED_GETMNTENT1 || defined MOUNTED_GETMNTENT2
 
 /* Return the device number from MOUNT_OPTIONS, if possible.
@@ -93,106 +114,11 @@ dev_from_mount_options (char const *mount_options)
 
 #endif
 
-#ifdef MOUNTED_GETMNTENT2	/* SVR4.  */
-{
-  struct mnttab mnt;
-  char *table = MNTTAB;
-  FILE *fp;
-  int ret;
-  int lockfd = -1;
-
-# if defined F_RDLCK && defined F_SETLKW
-  /* MNTTAB_LOCK is a macro name of our own invention; it's not present in
-     e.g. Solaris 2.6.  If the SVR4 folks ever define a macro
-     for this file name, we should use their macro name instead.
-     (Why not just lock MNTTAB directly?  We don't know.)  */
-#  ifndef MNTTAB_LOCK
-#   define MNTTAB_LOCK "/etc/.mnttab.lock"
-#  endif
-  lockfd = open (MNTTAB_LOCK, O_RDONLY);
-  if (0 <= lockfd)
-    {
-      struct flock flock;
-      flock.l_type = F_RDLCK;
-      flock.l_whence = SEEK_SET;
-      flock.l_start = 0;
-      flock.l_len = 0;
-      while (fcntl (lockfd, F_SETLKW, &flock) == -1)
-	if (errno != EINTR)
-	  {
-	    int saved_errno = errno;
-	    close (lockfd);
-	    errno = saved_errno;
-	    return NULL;
-	  }
-    }
-  else if (errno != ENOENT)
-    return NULL;
-# endif
-
-  errno = 0;
-  fp = fopen (table, "r");
-  if (fp == NULL)
-    ret = errno;
-  else
-    {
-      while ((ret = getmntent (fp, &mnt)) == 0)
-	{
-	  me = xmalloc (sizeof *me);
-	  me->me_devname = xstrdup (mnt.mnt_special);
-	  me->me_mountdir = xstrdup (mnt.mnt_mountp);
-	  me->me_type = xstrdup (mnt.mnt_fstype);
-	  me->me_opts = xstrdup (mnt.mnt_mntopts);
-	  me->me_type_malloced = me->me_opts_malloced = 1;
-	  me->me_dummy = MNT_IGNORE (&mnt) != 0;
-	  me->me_remote = ME_REMOTE (me->me_devname, me->me_type);
-	  me->me_readonly = fs_check_if_readonly (me->me_opts);
-	  me->me_dev = dev_from_mount_options (mnt.mnt_mntopts);
-
-	  /* Add to the linked list. */
-	  *mtail = me;
-	  mtail = &me->me_next;
-	}
-
-      ret = fclose (fp) == EOF ? errno : 0 < ret ? 0 : -1;
-    }
-
-  if (0 <= lockfd && close (lockfd) != 0)
-    ret = errno;
-
-  if (0 <= ret)
-    {
-      errno = ret;
-      goto free_then_fail;
-    }
-}
-#endif /* MOUNTED_GETMNTENT2.  */
-
-/* Check for the "ro" pattern in the MOUNT_OPTIONS.
- *    Return true if found, Otherwise return false.  */
-static bool
-fs_check_if_readonly (char *mount_options)
-{
-  static char const readonly_pattern[] = "ro";
-  char *str1, *token, *saveptr1;
-  int j;
-
-  for (j = 1, str1 = mount_options;; j++, str1 = NULL)
-    {
-      token = strtok_r (str1, ",", &saveptr1);
-      if (token == NULL)
-	break;
-      if (strcmp (token, readonly_pattern) == 0)
-	return true;
-    }
-
-  return false;
-}
-
 /* Return a list of the currently mounted file systems, or NULL on error.
- *    Add each entry to the tail of the list so that they stay in order.
- *       If NEED_FS_TYPE is true, ensure that the file system type fields in
- *          the returned list are valid.  Otherwise, they might not be.  */
+   Add each entry to the tail of the list so that they stay in order.
+   If NEED_FS_TYPE is true, ensure that the file system type fields in
+   the returned list are valid.  Otherwise, they might not be.  */
+
 struct mount_entry *
 read_file_system_list (bool need_fs_type)
 {
@@ -217,8 +143,9 @@ read_file_system_list (bool need_fs_type)
 	me->me_devname = xstrdup (mnt->mnt_fsname);
 	me->me_mountdir = xstrdup (mnt->mnt_dir);
 	me->me_type = xstrdup (mnt->mnt_type);
+	me->me_type_malloced = 1;
 	me->me_opts = xstrdup (mnt->mnt_opts);
-	me->me_type_malloced = me->me_opts_malloced = 1;
+	me->me_opts_malloced = 1;
 	me->me_dummy = ME_DUMMY (me->me_devname, me->me_type);
 	me->me_remote = ME_REMOTE (me->me_devname, me->me_type);
 	me->me_readonly = fs_check_if_readonly (me->me_opts);
@@ -234,8 +161,85 @@ read_file_system_list (bool need_fs_type)
   }
 #endif /* MOUNTED_GETMNTENT1. */
 
+#ifdef MOUNTED_GETMNTENT2	/* SVR4.  */
+  {
+    struct mnttab mnt;
+    char *table = MNTTAB;
+    FILE *fp;
+    int ret;
+    int lockfd = -1;
+
+# if defined F_RDLCK && defined F_SETLKW
+    /* MNTTAB_LOCK is a macro name of our own invention; it's not present in
+       e.g. Solaris 2.6.  If the SVR4 folks ever define a macro
+       for this file name, we should use their macro name instead.
+       (Why not just lock MNTTAB directly?  We don't know.)  */
+#  ifndef MNTTAB_LOCK
+#   define MNTTAB_LOCK "/etc/.mnttab.lock"
+#  endif
+    lockfd = open (MNTTAB_LOCK, O_RDONLY);
+    if (0 <= lockfd)
+      {
+	struct flock flock;
+	flock.l_type = F_RDLCK;
+	flock.l_whence = SEEK_SET;
+	flock.l_start = 0;
+	flock.l_len = 0;
+	while (fcntl (lockfd, F_SETLKW, &flock) == -1)
+	  if (errno != EINTR)
+	    {
+	      int saved_errno = errno;
+	      close (lockfd);
+	      errno = saved_errno;
+	      return NULL;
+	    }
+      }
+    else if (errno != ENOENT)
+      return NULL;
+# endif
+
+    errno = 0;
+    fp = fopen (table, "r");
+    if (fp == NULL)
+      ret = errno;
+    else
+      {
+	while ((ret = getmntent (fp, &mnt)) == 0)
+	  {
+	    me = xmalloc (sizeof *me);
+	    me->me_devname = xstrdup (mnt.mnt_special);
+	    me->me_mountdir = xstrdup (mnt.mnt_mountp);
+	    me->me_type = xstrdup (mnt.mnt_fstype);
+	    me->me_type_malloced = 1;
+	    me->me_opts = xstrdup (mnt.mnt_mntopts);
+	    me->me_opts_malloced = 1;
+	    me->me_dummy = MNT_IGNORE (&mnt) != 0;
+	    me->me_remote = ME_REMOTE (me->me_devname, me->me_type);
+	    me->me_readonly = fs_check_if_readonly (me->me_opts);
+	    me->me_dev = dev_from_mount_options (mnt.mnt_mntopts);
+
+	    /* Add to the linked list. */
+	    *mtail = me;
+	    mtail = &me->me_next;
+	  }
+
+	ret = fclose (fp) == EOF ? errno : 0 < ret ? 0 : -1;
+      }
+
+    if (0 <= lockfd && close (lockfd) != 0)
+      ret = errno;
+
+    if (0 <= ret)
+      {
+	errno = ret;
+	goto free_then_fail;
+      }
+  }
+#endif /* MOUNTED_GETMNTENT2.  */
+
   *mtail = NULL;
   return mount_list;
+
 
 free_then_fail:
   {

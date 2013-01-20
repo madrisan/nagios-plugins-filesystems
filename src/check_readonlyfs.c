@@ -38,13 +38,14 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#include "error.h"
 #include "mountlist.h"
 #include "nputils.h"
 #include "xalloc.h"
 
 #define STREQ(a, b) (strcmp (a, b) == 0)
 
-static const char *program_name = "check_readonlyfs";
+const char *program_name = "check_readonlyfs";
 static const char *program_version = PACKAGE_VERSION;
 static const char *program_copyright =
   "Copyright (C) 2013 Davide Madrisan <" PACKAGE_BUGREPORT ">";
@@ -167,9 +168,9 @@ check_all_entries (void)
 	printf ("%s  (%s) %s\n", me->me_mountdir,
 		me->me_type, (me->me_readonly) ? " *** readonly! ***" : "");
       else if (me->me_readonly && (status == STATE_OK))
-	fprintf (stderr, "FILESYSTEMS CRITICAL: %s", me->me_mountdir);
+	printf ("FILESYSTEMS CRITICAL: %s", me->me_mountdir);
       else if (me->me_readonly)
-	fprintf (stderr, ",%s", me->me_mountdir);
+	printf (",%s", me->me_mountdir);
 
       if (me->me_readonly)
 	status = STATE_CRITICAL;
@@ -271,7 +272,6 @@ main (int argc, char **argv)
 
   /* Fail if the same file system type was both selected and excluded.  */
   {
-    bool match = false;
     struct fs_type_list *fs_incl;
     for (fs_incl = fs_select_list; fs_incl; fs_incl = fs_incl->fs_next)
       {
@@ -279,17 +279,11 @@ main (int argc, char **argv)
 	for (fs_excl = fs_exclude_list; fs_excl; fs_excl = fs_excl->fs_next)
 	  {
 	    if (STREQ (fs_incl->fs_name, fs_excl->fs_name))
-	      {
-		fprintf (stderr,
-			 "%s: file system type `%s' both selected and excluded\n",
-			 program_name, fs_incl->fs_name);
-		match = true;
-		break;
-	      }
+	      error (STATE_UNKNOWN, 0,
+		     "file system type `%s' both selected and excluded\n",
+		     fs_incl->fs_name);
 	  }
       }
-    if (match)
-      return STATE_UNKNOWN;
   }
 
   if (optind < argc)
@@ -308,8 +302,7 @@ main (int argc, char **argv)
 	  if ((fd < 0 || fstat (fd, &stats[i - optind]))
 	      && stat (argv[i], &stats[i - optind]))
 	    {
-	      fprintf (stderr, "%s, cannot open `%s\n'", program_name,
-		       argv[i]);
+	      error (0, 0, "cannot open `%s'\n", argv[i]);
 	      argv[i] = NULL;
 	    }
 	  if (0 <= fd)
@@ -323,12 +316,8 @@ main (int argc, char **argv)
 			    || fs_exclude_list != NULL || show_local_fs));
 
   if (NULL == mount_list)
-    {
-      /* Couldn't read the table of mounted file systems. */
-      fprintf (stderr, "%s: cannot read table of mounted file systems\n",
-	       program_name);
-      return STATE_UNKNOWN;
-    }
+    /* Couldn't read the table of mounted file systems. */
+    error (STATE_UNKNOWN, 0, "cannot read table of mounted file systems\n");
 
   if (optind < argc)
     {
@@ -338,10 +327,9 @@ main (int argc, char **argv)
 	if (argv[i] && (check_entry (argv[i]) == STATE_CRITICAL))
 	  {
 	    if (!show_listed_fs)
-	      fprintf (stderr, "%s%s",
-		       status == STATE_OK ? "FILESYSTEMS CRITICAL: " : ",",
-		       argv[i]);
-
+	      printf ("%s%s",
+		      status == STATE_OK ? "FILESYSTEMS CRITICAL: " : ",",
+		      argv[i]);
 	    status = STATE_CRITICAL;
 	  }
     }
@@ -369,14 +357,17 @@ main (int argc, char **argv)
       free (fsp);
       fsp = next;
     }
+  /* free 'fs_select_list' */
+  fsp = fs_select_list;
+  while (fsp)
+    {
+      next = fsp->fs_next;
+      free (fsp);
+      fsp = next;
+    }
 
   if (!show_listed_fs)
-    {
-      if (status == STATE_OK)
-	printf ("FILESYSTEMS OK\n");
-      else
-	fprintf (stderr, " readonly!\n");
-    }
+    printf ("%s\n", (status == STATE_OK) ? "FILESYSTEMS OK" : " readonly!");
 
   return status;
 }

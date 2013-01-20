@@ -236,7 +236,6 @@ int
 main (int argc, char **argv)
 {
   int c, status = STATE_OK;
-  struct mount_entry *me, *meprev;
   struct stat *stats = 0;
 
   fs_select_list = NULL;
@@ -335,36 +334,6 @@ main (int argc, char **argv)
     }
   else
     status = check_all_entries ();
-
-  me = mount_list;
-  while (me)
-    {
-      meprev = me;
-      me = me->me_next;
-      if (meprev->me_type_malloced)
-	free (meprev->me_type);
-      if (meprev->me_opts_malloced)
-	free (meprev->me_opts);
-      free (meprev);
-    }
-  free (mount_list);
-
-  /* free 'fs_exclude_list' */
-  struct fs_type_list *fsp = fs_exclude_list, *next;
-  while (fsp)
-    {
-      next = fsp->fs_next;
-      free (fsp);
-      fsp = next;
-    }
-  /* free 'fs_select_list' */
-  fsp = fs_select_list;
-  while (fsp)
-    {
-      next = fsp->fs_next;
-      free (fsp);
-      fsp = next;
-    }
 
   if (!show_listed_fs)
     printf ("%s\n", (status == STATE_OK) ? "FILESYSTEMS OK" : " readonly!");

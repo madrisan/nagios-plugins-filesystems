@@ -2,8 +2,8 @@ AM_CFLAGS = @WARNINGS@
 
 noinst_LIBRARIES = libfilesystems.a
 libfilesystems_a_SOURCES = \
-   error.c mountlist.c \
-   error.h xalloc.h xmalloc.c nputils.h compat_getopt.h
+   error.c mountlist.c xmalloc.c \
+   error.h xalloc.h mountlist.h nputils.h compat_getopt.h
 libfilesystems_a_LIBADD = $(LIBOBJS)
 
 libexec_PROGRAMS = check_readonlyfs

@@ -1,5 +1,7 @@
-nagios-plugins-linux-filesystems
-================================
+nagios-plugins-filesystems
+==========================
+
+## check_readonlyfs
 
 This Nagios plugin checks for readonly filesystems.
 
@@ -57,9 +59,9 @@ sticking closely to ANSI C/POSIX.
 This is a list of platforms this nagios plugin is known to compile and run on
 
         Linux with kernel 3.4 and glibc 2.16.0 (openmamba milestone 2.75.0)
-
+        SunOS openindiana 5.11 with gcc 4.3.3
 
 ## Bugs
 
 If you find a bug please create an issue in the project bug tracker at
-https://github.com/madrisan/nagios-plugins-linux-filesystems/issues
+https://github.com/madrisan/nagios-plugins-filesystems/issues

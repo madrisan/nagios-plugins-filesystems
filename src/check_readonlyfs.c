@@ -38,6 +38,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#include "common.h"
 #include "error.h"
 #include "mountlist.h"
 #include "nputils.h"
@@ -86,8 +87,8 @@ static bool show_local_fs;
 static bool show_listed_fs;
 
 static struct option const longopts[] = {
-  {(char *) "help", no_argument, NULL, 'h'},
-  {(char *) "version", no_argument, NULL, 'v'},
+  {(char *) "help", no_argument, NULL, GETOPT_HELP_CHAR},
+  {(char *) "version", no_argument, NULL, GETOPT_VERSION_CHAR},
   {(char *) "local", no_argument, NULL, 'l'},
   {(char *) "list", no_argument, NULL, 'L'},
   {(char *) "type", required_argument, NULL, 'T'},
@@ -213,23 +214,17 @@ static void __attribute__ ((__noreturn__)) usage (FILE * out)
   -l, --local               limit listing to local file systems\n\
   -L, --list                display the list of checked file systems\n\
   -T, --type=TYPE           limit listing to file systems of type TYPE\n\
-  -X, --exclude-type=TYPE   limit listing to file systems not of type TYPE\n\
-  -h, --help                display this help and exit\n\
-  -v, --version             output version information and exit\n", out);
+  -X, --exclude-type=TYPE   limit listing to file systems not of type TYPE\n", out);
+  fputs (HELP_OPTION_DESCRIPTION, out);
+  fputs (VERSION_OPTION_DESCRIPTION, out);
 
   exit (out == stderr ? STATE_UNKNOWN : STATE_OK);
 }
 
-static void __attribute__ ((__noreturn__)) print_version (void)
+static void print_version (void)
 {
-  printf ("%s, version %s\n", program_name, program_version);
-  printf ("%s\n", program_copyright);
-  fputs ("\
-License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>\n\n\
-This is free software; you are free to change and redistribute it.\n\
-There is NO WARRANTY, to the extent permitted by law.\n", stdout);
-
-  exit (STATE_OK);
+  printf ("%s, version %s\n%s\n", program_name, program_version,
+	  program_copyright);
 }
 
 int
@@ -260,12 +255,10 @@ main (int argc, char **argv)
 	case 'X':
 	  add_excluded_fs_type (optarg);
 	  break;
-	case 'h':
-	  usage (stdout);
-	  break;
-	case 'v':
-	  print_version ();
-	  break;
+
+	case_GETOPT_HELP_CHAR
+	case_GETOPT_VERSION_CHAR
+
 	}
     }
 

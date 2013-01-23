@@ -307,13 +307,13 @@ main (int argc, char **argv)
     {
       int i;
 
-      /* Open each of the given entries to make sure any corresponding                                            
-       * partition is automounted.  This must be done before reading the                                          
+      /* Open each of the given entries to make sure any corresponding
+       * partition is automounted.  This must be done before reading the
        * file system table.  */
       stats = xnmalloc (argc - optind, sizeof *stats);
       for (i = optind; i < argc; ++i)
 	{
-	  /* Prefer to open with O_NOCTTY and use fstat, but fall back                                             
+	  /* Prefer to open with O_NOCTTY and use fstat, but fall back
 	   * on using "stat", in case the file is unreadable.  */
 	  int fd = open (argv[i], O_RDONLY | O_NOCTTY);
 	  if ((fd < 0 || fstat (fd, &stats[i - optind]))

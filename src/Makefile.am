@@ -6,7 +6,10 @@ libfilesystems_a_SOURCES = \
    common.h error.h xalloc.h mountlist.h nputils.h compat_getopt.h
 libfilesystems_a_LIBADD = $(LIBOBJS)
 
-libexec_PROGRAMS = check_readonlyfs
+libexec_PROGRAMS = check_readonlyfs check_ifmount
 
 check_readonlyfs_SOURCES = check_readonlyfs.c
 check_readonlyfs_LDADD = libfilesystems.a
+
+check_ifmount_SOURCES = check_ifmount.c
+check_ifmount_LDADD = libfilesystems.a

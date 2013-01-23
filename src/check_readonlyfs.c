@@ -79,6 +79,10 @@ static struct fs_type_list *fs_exclude_list;
 /* Linked list of mounted file systems. */
 static struct mount_entry *mount_list;
 
+/* If true, show even file systems with zero size or
+   uninteresting types. */
+static bool show_all_fs;
+
 /* If true, show only local file systems.  */
 static bool show_local_fs;
 
@@ -87,12 +91,13 @@ static bool show_local_fs;
 static bool show_listed_fs;
 
 static struct option const longopts[] = {
-  {(char *) "help", no_argument, NULL, GETOPT_HELP_CHAR},
-  {(char *) "version", no_argument, NULL, GETOPT_VERSION_CHAR},
+  {(char *) "all", no_argument, NULL, 'a'},
   {(char *) "local", no_argument, NULL, 'l'},
   {(char *) "list", no_argument, NULL, 'L'},
   {(char *) "type", required_argument, NULL, 'T'},
   {(char *) "exclude-type", required_argument, NULL, 'X'},
+  {(char *) "help", no_argument, NULL, GETOPT_HELP_CHAR},
+  {(char *) "version", no_argument, NULL, GETOPT_VERSION_CHAR},
   {NULL, 0, NULL, 0}
 };
 
@@ -152,6 +157,21 @@ excluded_fstype (const char *fstype)
   return false;
 }
 
+static bool
+skip_mount_entry (struct mount_entry *me)
+{
+  if (me->me_remote && show_local_fs)
+    return true;
+
+  if (me->me_dummy && !show_all_fs)
+    return true;
+
+  if (!selected_fstype (me->me_type) || excluded_fstype (me->me_type))
+    return true;
+
+  return false;
+}
+
 static int
 check_all_entries (void)
 {
@@ -160,14 +180,12 @@ check_all_entries (void)
 
   for (me = mount_list; me; me = me->me_next)
     {
-      if ((excluded_fstype (me->me_type) == true) ||
-	  (selected_fstype (me->me_type) == false) ||
-	  (show_local_fs && me->me_remote))
+      if (skip_mount_entry (me))
 	continue;
 
       if (show_listed_fs)
-	printf ("%s  (%s) %s\n", me->me_mountdir,
-		me->me_type, (me->me_readonly) ? " *** readonly! ***" : "");
+	printf ("%-10s %s %s\n", me->me_devname, me->me_mountdir,
+		(me->me_readonly) ? "<< readonly" : "");
       else if (me->me_readonly && (status == STATE_OK))
 	printf ("FILESYSTEMS CRITICAL: %s", me->me_mountdir);
       else if (me->me_readonly)
@@ -188,14 +206,12 @@ check_entry (char const *name)
   for (me = mount_list; me; me = me->me_next)
     if (STREQ (me->me_mountdir, name))
       {
-	if ((excluded_fstype (me->me_type) == true) ||
-	    (selected_fstype (me->me_type) == false) ||
-	    (show_local_fs && me->me_remote))
+	if (skip_mount_entry (me))
 	  return STATE_OK;
 
 	if (show_listed_fs)
-	  printf ("%s  (%s) %s\n", me->me_mountdir,
-		  me->me_type, (me->me_readonly) ? " *** readonly! ***" : "");
+	  printf ("%-10s %s %s\n", me->me_devname, me->me_mountdir,
+		  (me->me_readonly) ? "<< readonly" : "");
 
 	if (me->me_readonly)
 	  return STATE_CRITICAL;
@@ -211,6 +227,7 @@ static void __attribute__ ((__noreturn__)) usage (FILE * out)
   fprintf (out, "%s\n\n", program_copyright);
   fprintf (out, "Usage: %s [OPTION]... [FILESYSTEM]...\n\n", program_name);
   fputs ("\
+  -a, --all                 include dummy file systems\n\
   -l, --local               limit listing to local file systems\n\
   -L, --list                display the list of checked file systems\n\
   -T, --type=TYPE           limit listing to file systems of type TYPE\n\
@@ -221,7 +238,8 @@ static void __attribute__ ((__noreturn__)) usage (FILE * out)
   exit (out == stderr ? STATE_UNKNOWN : STATE_OK);
 }
 
-static void print_version (void)
+static void
+print_version (void)
 {
   printf ("%s, version %s\n%s\n", program_name, program_version,
 	  program_copyright);
@@ -236,12 +254,19 @@ main (int argc, char **argv)
   fs_select_list = NULL;
   fs_exclude_list = NULL;
 
-  while ((c = getopt_long (argc, argv, "lLT:X:hv", longopts, NULL)) != -1)
+  show_local_fs = false;
+  show_listed_fs = false;
+  show_all_fs = false;
+
+  while ((c = getopt_long (argc, argv, "alLT:X:hv", longopts, NULL)) != -1)
     {
       switch (c)
 	{
 	default:
 	  usage (stderr);
+	  break;
+	case 'a':
+	  show_all_fs = true;
 	  break;
 	case 'l':
 	  show_local_fs = true;
@@ -257,7 +282,7 @@ main (int argc, char **argv)
 	  break;
 
 	case_GETOPT_HELP_CHAR
-	case_GETOPT_VERSION_CHAR
+        case_GETOPT_VERSION_CHAR
 
 	}
     }

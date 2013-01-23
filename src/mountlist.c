@@ -39,6 +39,9 @@
 #ifndef ME_DUMMY
 # define ME_DUMMY(Fs_name, Fs_type)             \
     (strcmp (Fs_type, "autofs") == 0            \
+     || strcmp (Fs_type, "binfmt_misc") == 0    \
+     || strcmp (Fs_type, "devpts") == 0         \
+     || strcmp (Fs_type, "fusectl") == 0        \
      || strcmp (Fs_type, "none") == 0           \
      || strcmp (Fs_type, "proc") == 0           \
      || strcmp (Fs_type, "subfs") == 0          \

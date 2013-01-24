@@ -1,0 +1,16 @@
+
+  Major changes between "nagios-plugins-filesystems" versions 1 and 2
+
+* New module check_ifmount.c
+* check_readonlyfs: new option -a|--all
+* New header file 'common.h' containing stuff needed by all plugins.
+
+======================================================================
+
+  Major changes between "nagios-plugins-filesystems" versions 0 and 1
+
+* Add some documentation.
+* Porting to Solaris and OpenIndiana 5.11 with gcc.
+* Module 'check_readonlyfs' for Linux.
+
+======================================================================

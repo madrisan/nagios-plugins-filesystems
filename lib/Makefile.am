@@ -15,18 +15,21 @@
 ## You should have received a copy of the GNU General Public License
 ## along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-AM_CFLAGS = @WARNINGS@
-AM_CPPFLAGS = -I$(top_srcdir)/lib
+AM_CPPFLAGS = -I$(top_srcdir)/src
 
-libexec_PROGRAMS = \
-  check_readonlyfs \
-  check_ifmount
+noinst_LIBRARIES = libfilesystems.a
 
-noinst_HEADERS =   \
-  common.h         \
+libfilesystems_a_SOURCES = \
+  error.c                  \
+  mountlist.c              \
+  xmalloc.c
+
+noinst_HEADERS =  \
+  common.h        \
+  compat_getopt.h \
+  error.h         \
+  mountlist.h     \
+  nputils.h       \
   xalloc.h
 
-LDADD = ../lib/libfilesystems.a
-
-check_readonlyfs_SOURCES = check_readonlyfs.c
-check_ifmount_SOURCES = check_ifmount.c
+libfilesystems_a_LIBADD = $(LIBOBJS)

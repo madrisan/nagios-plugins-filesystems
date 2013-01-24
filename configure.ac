@@ -8,7 +8,7 @@ AC_INIT([PROG_NAME],[PROG_VERSION],[PROG_BUGREPORT],[PROG_NAME])
 AC_PREREQ([2.60])
 
 AC_CONFIG_SRCDIR([src/check_readonlyfs.c])
-#AC_CONFIG_LIBOBJ_DIR([lib])
+AC_CONFIG_LIBOBJ_DIR([lib])
 AC_CONFIG_HEADERS(config.h:config.hin)
 
 AM_INIT_AUTOMAKE([gnu dist-bzip2])
@@ -155,5 +155,9 @@ fi])
 dnl Provide implementation of some required functions if necessary
 AC_REPLACE_FUNCS(getopt_long)
 
-AC_CONFIG_FILES([Makefile src/Makefile])
+AC_CONFIG_FILES([
+   Makefile
+   lib/Makefile
+   src/Makefile
+])
 AC_OUTPUT

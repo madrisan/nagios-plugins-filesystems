@@ -22,10 +22,6 @@ libexec_PROGRAMS = \
   check_readonlyfs \
   check_ifmount
 
-noinst_HEADERS =   \
-  common.h         \
-  xalloc.h
-
 LDADD = ../lib/libfilesystems.a
 
 check_readonlyfs_SOURCES = check_readonlyfs.c

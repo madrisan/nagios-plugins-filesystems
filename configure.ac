@@ -23,15 +23,20 @@ AC_PROG_CC
 AC_PROG_GCC_TRADITIONAL
 AC_PROG_RANLIB
 
-AC_C_INLINE
-
 dnl Checks for header files
 AC_HEADER_STDC
+
+dnl Checks for typedefs, structures, and compiler characteristics.
+AC_C_CONST
+AC_C_PROTOTYPES
+AC_C_INLINE
 
 # Determine how to get the list of mounted file systems.
 ac_list_mounted_fs=
 
 AC_FUNC_GETMNTENT
+
+AC_CHECK_HEADERS([sys/mntent.h mntent.h])
 
 if test -z "$ac_list_mounted_fs"; then
   # AIX.
@@ -109,6 +114,78 @@ if test $ac_cv_func_getmntent = yes; then
 
 fi
 
+AC_CHECK_HEADERS([sys/param.h])
+AC_CHECK_HEADERS([sys/mount.h], [], [],
+[[#if HAVE_SYS_PARAM_H
+#include <sys/param.h>
+#endif
+]])
+AC_CHECK_HEADERS(sys/types.h sys/mount.h sys/statvfs.h)
+
+AC_CHECK_FUNCS([getmntinfo])
+
+if test -z "$ac_list_mounted_fs"; then
+
+  # 4.4BSD and DEC OSF/1.
+  AC_MSG_CHECKING([for getmntinfo function])
+  AC_CACHE_VAL([fu_cv_sys_mounted_getmntinfo],
+    [
+      test "$ac_cv_func_getmntinfo" = yes \
+          && fu_cv_sys_mounted_getmntinfo=yes \
+          || fu_cv_sys_mounted_getmntinfo=no
+    ])
+  AC_MSG_RESULT([$fu_cv_sys_mounted_getmntinfo])
+  if test $fu_cv_sys_mounted_getmntinfo = yes; then
+    AC_MSG_CHECKING([whether getmntinfo returns statvfs structures])
+    AC_CACHE_VAL([fu_cv_sys_mounted_getmntinfo2],
+      [
+        AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
+#if HAVE_SYS_PARAM_H
+# include <sys/param.h>
+#endif
+#include <sys/types.h>
+#if HAVE_SYS_MOUNT_H
+# include <sys/mount.h>
+#endif
+#if HAVE_SYS_STATVFS_H
+# include <sys/statvfs.h>
+#endif
+extern
+#ifdef __cplusplus
+"C"
+#endif
+int getmntinfo (struct statfs **, int);
+            ]], [])],
+          [fu_cv_sys_mounted_getmntinfo2=no],
+          [fu_cv_sys_mounted_getmntinfo2=yes])
+      ])
+    AC_MSG_RESULT([$fu_cv_sys_mounted_getmntinfo2])
+    if test $fu_cv_sys_mounted_getmntinfo2 = no; then
+      ac_list_mounted_fs=found
+      AC_DEFINE([MOUNTED_GETMNTINFO], [1],
+                [Define if there is a function named getmntinfo for reading the
+                 list of mounted file systems and it returns an array of
+                 'struct statfs'.  (4.4BSD, Darwin)])
+    else
+      ac_list_mounted_fs=found
+      AC_DEFINE([MOUNTED_GETMNTINFO2], [1],
+                [Define if there is a function named getmntinfo for reading the
+                 list of mounted file systems and it returns an array of
+                 'struct statvfs'.  (NetBSD 3.0)])
+    fi
+  fi
+fi
+
+AC_CHECK_MEMBERS([struct statfs.f_fstypename],
+  [AC_DEFINE([HAVE_STRUCT_STATFS_F_FSTYPENAME], [1],
+             [Define if struct statfs has the f_fstypename member.  (OpenBSD 5.2)])
+  ],,
+  [ #include <sys/types.h>
+    #include <sys/param.h>
+    #include <sys/mount.h>
+  ])
+
+
 AC_CHECK_HEADERS(getopt.h err.h)
 AC_MSG_CHECKING([for struct option in getopt])
 AC_COMPILE_IFELSE(
@@ -118,13 +195,7 @@ AC_COMPILE_IFELSE(
   [ac_cv_struct_option_getopt_h=no])
 AC_MSG_RESULT([$ac_cv_struct_option_getopt_h])
 
-AC_CHECK_HEADERS([sys/mntent.h mntent.h])
-
 AC_PREFIX_DEFAULT(/usr/local/nagios)
-
-dnl Checks for typedefs, structures, and compiler characteristics.
-AC_C_CONST
-AC_C_PROTOTYPES
 
 AC_MSG_CHECKING(for gcc compiler warnings)
 AC_ARG_ENABLE(warnings,

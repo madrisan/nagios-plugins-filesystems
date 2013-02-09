@@ -11,6 +11,10 @@
 #include "mountlist.h"
 #include "xalloc.h"
 
+#if HAVE_SYS_PARAM_H
+#include <sys/param.h>
+#endif
+
 #ifdef MOUNTED_GETMNTENT1
 # include <mntent.h>
 # if !defined MOUNTED
@@ -22,6 +26,10 @@
 
 #ifdef MOUNTED_GETMNTENT2	/* SVR4.  */
 # include <sys/mnttab.h>
+#endif
+
+#ifdef MOUNTED_GETMNTINFO	/* 4.4BSD.  */
+# include <sys/mount.h>
 #endif
 
 #if HAVE_SYS_MNTENT_H
@@ -61,6 +69,116 @@
          && (strcmp (Fs_type, "smbfs") == 0     \
              || strcmp (Fs_type, "cifs") == 0)))
 #endif
+
+#if MOUNTED_GETMNTINFO
+
+# if ! HAVE_STRUCT_STATFS_F_FSTYPENAME
+static char *
+fstype_to_string (short int t)
+{
+  switch (t)
+    {
+#  ifdef MOUNT_PC
+    case MOUNT_PC:
+      return "pc";
+#  endif
+#  ifdef MOUNT_MFS
+    case MOUNT_MFS:
+      return "mfs";
+#  endif
+#  ifdef MOUNT_LO
+    case MOUNT_LO:
+      return "lo";
+#  endif
+#  ifdef MOUNT_TFS
+    case MOUNT_TFS:
+      return "tfs";
+#  endif
+#  ifdef MOUNT_TMP
+    case MOUNT_TMP:
+      return "tmp";
+#  endif
+#  ifdef MOUNT_UFS
+   case MOUNT_UFS:
+     return "ufs" ;
+#  endif
+#  ifdef MOUNT_NFS
+   case MOUNT_NFS:
+     return "nfs" ;
+#  endif
+#  ifdef MOUNT_MSDOS
+   case MOUNT_MSDOS:
+     return "msdos" ;
+#  endif
+#  ifdef MOUNT_LFS
+   case MOUNT_LFS:
+     return "lfs" ;
+#  endif
+#  ifdef MOUNT_LOFS
+   case MOUNT_LOFS:
+     return "lofs" ;
+#  endif
+#  ifdef MOUNT_FDESC
+   case MOUNT_FDESC:
+     return "fdesc" ;
+#  endif
+#  ifdef MOUNT_PORTAL
+   case MOUNT_PORTAL:
+     return "portal" ;
+#  endif
+#  ifdef MOUNT_NULL
+   case MOUNT_NULL:
+     return "null" ;
+#  endif
+#  ifdef MOUNT_UMAP
+   case MOUNT_UMAP:
+     return "umap" ;
+#  endif
+#  ifdef MOUNT_KERNFS
+   case MOUNT_KERNFS:
+     return "kernfs" ;
+#  endif
+#  ifdef MOUNT_PROCFS
+   case MOUNT_PROCFS:
+     return "procfs" ;
+#  endif
+#  ifdef MOUNT_AFS
+   case MOUNT_AFS:
+     return "afs" ;
+#  endif
+#  ifdef MOUNT_CD9660
+   case MOUNT_CD9660:
+     return "cd9660" ;
+#  endif
+#  ifdef MOUNT_UNION
+   case MOUNT_UNION:
+     return "union" ;
+#  endif
+#  ifdef MOUNT_DEVFS
+   case MOUNT_DEVFS:
+     return "devfs" ;
+#  endif
+#  ifdef MOUNT_EXT2FS
+   case MOUNT_EXT2FS:
+     return "ext2fs" ;
+#  endif
+    default:
+      return "?";
+    }
+}
+# endif
+
+static char *
+fsp_to_string (const struct statfs *fsp)
+{
+# if HAVE_STRUCT_STATFS_F_FSTYPENAME
+  return (char *) (fsp->f_fstypename);
+# else
+  return fstype_to_string (fsp->f_type);
+# endif
+}
+
+#endif /* MOUNTED_GETMNTINFO */
 
 /* Check for the "ro" pattern in the MOUNT_OPTIONS.
  *    Return true if found, Otherwise return false.  */
@@ -240,6 +358,37 @@ read_file_system_list (bool need_fs_type)
       }
   }
 #endif /* MOUNTED_GETMNTENT2.  */
+
+#ifdef MOUNTED_GETMNTINFO	/* 4.4BSD.  */
+  {
+    struct statfs *fsp;
+    int entries;
+
+    entries = getmntinfo (&fsp, MNT_NOWAIT);
+    if (entries < 0)
+      return NULL;
+    for (; entries-- > 0; fsp++)
+      {
+        char *fs_type = fsp_to_string (fsp);
+
+        me = xmalloc (sizeof *me);
+        me->me_devname = xstrdup (fsp->f_mntfromname);
+        me->me_mountdir = xstrdup (fsp->f_mntonname);
+        me->me_type = fs_type;
+        me->me_type_malloced = 0;
+        me->me_opts = NULL;	/* FIXME: fsp->f_flags */
+        me->me_opts_malloced = 0;
+        me->me_dummy = ME_DUMMY (me->me_devname, me->me_type);
+        me->me_remote = ME_REMOTE (me->me_devname, me->me_type);
+        me->me_readonly = (fsp->f_flags & MNT_RDONLY);
+        me->me_dev = (dev_t) -1;        /* Magic; means not known yet. */
+
+        /* Add to the linked list. */
+        *mtail = me;
+        mtail = &me->me_next;
+      }
+  }
+#endif /* MOUNTED_GETMNTINFO */
 
   *mtail = NULL;
   return mount_list;

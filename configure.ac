@@ -185,6 +185,10 @@ AC_CHECK_MEMBERS([struct statfs.f_fstypename],
     #include <sys/mount.h>
   ])
 
+if test -z "$ac_list_mounted_fs"; then
+  AC_MSG_ERROR([Cannot found a way to list the mounted filesystems: unsupported operating system.
+Please drop a note to <PROG_BUGREPORT>])
+fi
 
 AC_CHECK_HEADERS(getopt.h err.h)
 AC_MSG_CHECKING([for struct option in getopt])

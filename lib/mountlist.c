@@ -178,6 +178,77 @@ fsp_to_string (const struct statfs *fsp)
 # endif
 }
 
+/* Map from mount options to printable formats. */
+static struct opt
+{
+  int o_opt;
+  const char *o_optname;
+} optnames[] = {
+# ifdef MNT_ASYNC
+  {MNT_ASYNC, "async"},
+# endif
+# ifdef MNT_LOCAL
+  {MNT_LOCAL, "local"},
+# endif
+# ifdef MNT_NOATIME
+  {MNT_NOATIME, "noatime"},
+# endif
+# ifdef MNT_NODEV
+  {MNT_NODEV, "nodev"},
+# endif
+# ifdef MNT_NOEXEC
+  {MNT_NOEXEC, "noexec"},
+# endif
+# ifdef MNT_NOSUID
+  {MNT_NOSUID, "nosuid"},
+# endif
+# ifdef MNT_RDONLY
+  {MNT_RDONLY, "read-only"},
+# endif
+# ifdef MNT_SYNCHRONOUS
+  {MNT_SYNCHRONOUS, "sync"},
+# endif
+# ifdef MNT_SOFTDEP
+  {MNT_SOFTDEP, "softdep"},
+# endif
+  {0, ""}
+};
+
+char *
+catopt(char *s0, const char *s1)
+{
+  size_t i;
+  char *cp;
+
+  if (s0 && *s0)
+    {
+      i = strlen(s0) + strlen(s1) + 1 + 1;
+      if ((cp = malloc(i)) == NULL)
+	err(1, NULL);
+      (void)snprintf(cp, i, "%s,%s", s0, s1);
+    }
+  else
+    cp = strdup(s1);
+
+  free(s0);
+  return (cp);
+}
+
+static char *
+fsp_flags_to_string (u_int32_t f_flags)
+{
+  char *optlist = NULL;
+  struct opt *p;
+
+  for (p = optnames; p->o_opt; p++)
+    {
+      if (f_flags & p->o_opt && *p->o_optname)
+	optlist = catopt (optlist, p->o_optname);
+    } 
+
+  return optlist;
+}
+
 #endif /* MOUNTED_GETMNTINFO */
 
 /* Check for the "ro" pattern in the MOUNT_OPTIONS.
@@ -376,8 +447,8 @@ read_file_system_list (bool need_fs_type)
         me->me_mountdir = xstrdup (fsp->f_mntonname);
         me->me_type = fs_type;
         me->me_type_malloced = 0;
-        me->me_opts = NULL;	/* FIXME: fsp->f_flags */
-        me->me_opts_malloced = 0;
+        me->me_opts = fsp_flags_to_string (fsp->f_flags);
+        me->me_opts_malloced = 1;
         me->me_dummy = ME_DUMMY (me->me_devname, me->me_type);
         me->me_remote = ME_REMOTE (me->me_devname, me->me_type);
         me->me_readonly = (fsp->f_flags & MNT_RDONLY);

@@ -184,8 +184,9 @@ check_all_entries (void)
 	continue;
 
       if (show_listed_fs)
-	printf ("%-10s %s %s\n", me->me_devname, me->me_mountdir,
-		(me->me_readonly) ? "<< readonly" : "");
+	printf ("%-10s %s type %s (%s) %s\n",
+		me->me_devname, me->me_mountdir, me->me_type, me->me_opts,
+		(me->me_readonly) ? "<< read-only" : "");
       else if (me->me_readonly && (status == STATE_OK))
 	printf ("FILESYSTEMS CRITICAL: %s", me->me_mountdir);
       else if (me->me_readonly)
@@ -210,8 +211,9 @@ check_entry (char const *name)
 	  return STATE_OK;
 
 	if (show_listed_fs)
-	  printf ("%-10s %s %s\n", me->me_devname, me->me_mountdir,
-		  (me->me_readonly) ? "<< readonly" : "");
+	  printf ("%-10s %s type %s (%s) %s\n",
+		  me->me_devname, me->me_mountdir, me->me_type, me->me_opts,
+		  (me->me_readonly) ? "<< read-only" : "");
 
 	if (me->me_readonly)
 	  return STATE_CRITICAL;

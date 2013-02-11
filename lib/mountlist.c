@@ -55,6 +55,11 @@
 # include <sys/mount.h>
 #endif
 
+#ifdef MOUNTED_VMOUNT		/* AIX.  */
+# include <fshelp.h>
+# include <sys/vfs.h>
+#endif
+
 #if HAVE_SYS_MNTENT_H
 /* This is to get MNTOPT_IGNORE on e.g. SVR4.  */
 # include <sys/mntent.h>
@@ -274,6 +279,20 @@ fsp_flags_to_string (u_int32_t f_flags)
 
 #endif /* MOUNTED_GETMNTINFO */
 
+#ifdef MOUNTED_VMOUNT		/* AIX.  */
+static char *
+fstype_to_string (int t)
+{
+  struct vfs_ent *e;
+
+  e = getvfsbytype (t);
+  if (!e || !e->vfsent_name)
+    return "none";
+  else
+    return e->vfsent_name;
+}
+#endif /* MOUNTED_VMOUNT */
+
 /* Check for the "ro" pattern in the MOUNT_OPTIONS.
  *    Return true if found, Otherwise return false.  */
 static bool
@@ -483,6 +502,78 @@ read_file_system_list (bool need_fs_type)
       }
   }
 #endif /* MOUNTED_GETMNTINFO */
+
+#ifdef MOUNTED_VMOUNT		/* AIX.  */
+  {
+    int bufsize;
+    char *entries, *thisent;
+    struct vmount *vmp;
+    int n_entries;
+    int i;
+
+    /* Ask how many bytes to allocate for the mounted file system info.  */
+    if (mntctl (MCTL_QUERY, sizeof bufsize, (struct vmount *) &bufsize) != 0)
+      return NULL;
+    entries = xmalloc (bufsize);
+
+    /* Get the list of mounted file systems.  */
+    n_entries = mntctl (MCTL_QUERY, bufsize, (struct vmount *) entries);
+    if (n_entries < 0)
+      {
+        int saved_errno = errno;
+        free (entries);
+        errno = saved_errno;
+        return NULL;
+      }
+
+    for (i = 0, thisent = entries;
+         i < n_entries;
+         i++, thisent += vmp->vmt_length)
+      {
+        char *options, *ignore;
+
+        vmp = (struct vmount *) thisent;
+        me = xmalloc (sizeof *me);
+        if (vmp->vmt_flags & MNT_REMOTE)
+          {
+            char *host, *dir;
+
+            me->me_remote = 1;
+            /* Prepend the remote dirname.  */
+            host = thisent + vmp->vmt_data[VMT_HOSTNAME].vmt_off;
+            dir = thisent + vmp->vmt_data[VMT_OBJECT].vmt_off;
+            me->me_devname = xmalloc (strlen (host) + strlen (dir) + 2);
+            strcpy (me->me_devname, host);
+            strcat (me->me_devname, ":");
+            strcat (me->me_devname, dir);
+          }
+        else
+          {
+            me->me_remote = 0;
+            me->me_devname = xstrdup (thisent +
+                                      vmp->vmt_data[VMT_OBJECT].vmt_off);
+          }
+        me->me_mountdir = xstrdup (thisent + vmp->vmt_data[VMT_STUB].vmt_off);
+        me->me_type = xstrdup (fstype_to_string (vmp->vmt_gfstype));
+        me->me_type_malloced = 1;
+        options = thisent + vmp->vmt_data[VMT_ARGS].vmt_off;
+        me->me_opts = xstrdup (options);
+        me->me_opts_malloced = 1;
+        ignore = strstr (options, "ignore");
+        me->me_dummy = (ignore
+                        && (ignore == options || ignore[-1] == ',')
+                        && (ignore[sizeof "ignore" - 1] == ','
+                            || ignore[sizeof "ignore" - 1] == '\0'));
+        me->me_readonly = fs_check_if_readonly (me->me_opts);
+        me->me_dev = (dev_t) -1; /* vmt_fsid might be the info we want.  */
+
+        /* Add to the linked list. */
+        *mtail = me;
+        mtail = &me->me_next;
+      }
+    free (entries);
+  }
+#endif /* AIX.  */
 
   *mtail = NULL;
   return mount_list;

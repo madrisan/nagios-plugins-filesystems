@@ -60,7 +60,8 @@ This is a list of platforms this nagios plugin is known to compile and run on
 
         Linux with kernel 3.4 and glibc 2.16.0 (openmamba milestone 2.75.0)
         SunOS openindiana 5.11 with gcc 4.3.3
-        OpenBSD 5.2 with 4.2.1
+        OpenBSD 5.2 with gcc 4.2.1
+        AIX 6.1 with gcc 4.2.0
 
 ## Bugs
 

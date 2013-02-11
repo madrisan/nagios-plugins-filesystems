@@ -6,6 +6,9 @@
 
 set -e
 
+# AIX
+#export M4=/usr/linux/bin/m4
+
 aclocal
 autoheader
 automake --foreign --add-missing --copy

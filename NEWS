@@ -4,6 +4,9 @@
 * New module check_ifmount.c
 * check_readonlyfs: new option -a|--all
 * New header file 'common.h' containing stuff needed by all plugins.
+* Porting on OpenBSD.
+* Porting on AIX 6.1 with gcc.
+* Update package documentation.
 
 ======================================================================
 

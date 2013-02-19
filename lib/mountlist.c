@@ -591,6 +591,8 @@ free_then_fail:
 	free (mount_list->me_mountdir);
 	if (mount_list->me_type_malloced)
 	  free (mount_list->me_type);
+	if (mount_list->me_opts_malloced)
+	  free (mount_list->me_opts);
 	free (mount_list);
 	mount_list = me;
       }
